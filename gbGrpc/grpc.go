@@ -5,13 +5,15 @@ import (
 	"log"
 	"time"
 
+	"github.com/gobench-io/gobench/executor"
 	"github.com/gobench-io/gobench/executor/metrics"
 	"google.golang.org/grpc"
 )
 
 type GbClientConn struct {
 	*grpc.ClientConn
-	groups []metrics.Group
+	groups    []metrics.Group
+	graphsMap map[string][]metrics.Graph
 }
 
 func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
@@ -56,6 +58,54 @@ func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (c
 	}
 
 	return
+}
+
+func (cc *GbClientConn) setupMethod(method string) error {
+	if _, ok := cc.graphsMap[method]; ok {
+		return nil
+	}
+
+	graphs := []metrics.Graph{
+		{
+			Title: "gRPC Response",
+			Unit:  "N",
+			Metrics: []metrics.Metric{
+				{
+					Title: method + ".grpc_ok", // success
+					Type:  metrics.Counter,
+				},
+				{
+					Title: method + ".grpc_fail", // fail
+					Type:  metrics.Counter,
+				},
+			},
+		},
+		{
+			Title: "Latency",
+			Unit:  "Microsecond",
+			Metrics: []metrics.Metric{
+				{
+					Title: method + ".latency", // latency
+					Type:  metrics.Histogram,
+				},
+			},
+		},
+	}
+
+	cc.graphsMap[method] = graphs
+
+	group := metrics.Group{
+		Name:   "gRPC (" + cc.Target() + ")",
+		Graphs: graphs,
+	}
+
+	groups := []metrics.Group{
+		group,
+	}
+
+	err := executor.Setup(groups)
+
+	return err
 }
 
 func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
