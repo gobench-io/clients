@@ -60,9 +60,9 @@ func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (c
 	return
 }
 
-func (cc *GbClientConn) setupMethod(method string) error {
-	if _, ok := cc.graphsMap[method]; ok {
-		return nil
+func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
+	if graphs, ok := cc.graphsMap[method]; ok {
+		return graphs, nil
 	}
 
 	graphs := []metrics.Graph{
@@ -103,19 +103,31 @@ func (cc *GbClientConn) setupMethod(method string) error {
 		group,
 	}
 
+	// waiting?
 	err := executor.Setup(groups)
 
-	return err
+	return graphs, err
 }
 
 func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+	graphs, err := cc.setupMethod(method)
+
+	if err != nil {
+		// log?
+	}
+
 	begin := time.Now()
 
-	log.Println("Invoke")
 	err := cc.ClientConn.Invoke(ctx, method, args, reply, opts...)
 
 	// todo: record the duration
-	_ = time.Since(begin)
+	diff := time.Since(begin)
+
+	executor.Notify()
+	// record the metric
+	if err != nil {
+
+	}
 
 	return err
 }
