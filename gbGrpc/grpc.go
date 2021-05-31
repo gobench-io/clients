@@ -11,8 +11,9 @@ import (
 )
 
 type GbClientConn struct {
-	*grpc.ClientConn
+	grpc.ClientConnInterface
 	graphsMap map[string][]metrics.Graph
+	target    string
 }
 
 func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
@@ -20,12 +21,12 @@ func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
 }
 
 func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (conn *GbClientConn, err error) {
-	conn = &GbClientConn{}
-	if conn.ClientConn, err = grpc.DialContext(ctx, target, opts...); err != nil {
-		return
+	conn = &GbClientConn{
+		graphsMap: make(map[string][]metrics.Graph),
+		target:    target,
 	}
 
-	conn.graphsMap = make(map[string][]metrics.Graph)
+	conn.ClientConnInterface, err = grpc.DialContext(ctx, target, opts...)
 
 	return
 }
@@ -65,7 +66,7 @@ func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
 	cc.graphsMap[method] = graphs
 
 	group := metrics.Group{
-		Name:   "gRPC (" + cc.Target() + ")",
+		Name:   "gRPC (" + cc.target + ")",
 		Graphs: graphs,
 	}
 
@@ -80,15 +81,11 @@ func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
 }
 
 func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-	graphs, err := cc.setupMethod(method)
-
-	if err != nil {
-		// log?
-	}
+	graphs, _ := cc.setupMethod(method)
 
 	begin := time.Now()
 
-	err = cc.ClientConn.Invoke(ctx, method, args, reply, opts...)
+	err := cc.ClientConnInterface.Invoke(ctx, method, args, reply, opts...)
 
 	diff := time.Since(begin)
 
@@ -109,7 +106,7 @@ func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, me
 	begin := time.Now()
 
 	log.Println("New stream")
-	cs, err := cc.ClientConn.NewStream(ctx, desc, method, opts...)
+	cs, err := cc.ClientConnInterface.NewStream(ctx, desc, method, opts...)
 
 	// todo: record the duration
 	_ = time.Since(begin)
