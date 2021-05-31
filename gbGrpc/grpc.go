@@ -12,7 +12,6 @@ import (
 
 type GbClientConn struct {
 	*grpc.ClientConn
-	groups    []metrics.Group
 	graphsMap map[string][]metrics.Graph
 }
 
@@ -22,40 +21,11 @@ func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
 
 func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (conn *GbClientConn, err error) {
 	conn = &GbClientConn{}
-	conn.ClientConn, err = grpc.DialContext(ctx, target, opts...)
+	if conn.ClientConn, err = grpc.DialContext(ctx, target, opts...); err != nil {
+		return
+	}
 
-	group := metrics.Group{
-		Name: "gRPC (" + target + ")",
-		Graphs: []metrics.Graph{
-			{
-				Title: "gRPC Response",
-				Unit:  "N",
-				Metrics: []metrics.Metric{
-					{
-						Title: "", // success
-						Type:  metrics.Counter,
-					},
-					{
-						Title: "", // fail
-						Type:  metrics.Counter,
-					},
-				},
-			},
-			{
-				Title: "Latency",
-				Unit:  "Microsecond",
-				Metrics: []metrics.Metric{
-					{
-						Title: "", // latency
-						Type:  metrics.Histogram,
-					},
-				},
-			},
-		},
-	}
-	conn.groups = []metrics.Group{
-		group,
-	}
+	conn.graphsMap = make(map[string][]metrics.Graph)
 
 	return
 }
@@ -118,16 +88,19 @@ func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interfac
 
 	begin := time.Now()
 
-	err := cc.ClientConn.Invoke(ctx, method, args, reply, opts...)
+	err = cc.ClientConn.Invoke(ctx, method, args, reply, opts...)
 
-	// todo: record the duration
 	diff := time.Since(begin)
 
-	executor.Notify()
-	// record the metric
-	if err != nil {
+	latencyTitle := graphs[1].Metrics[0].Title
 
+	countTitle := graphs[0].Metrics[0].Title
+	if err != nil {
+		countTitle = graphs[0].Metrics[1].Title
 	}
+
+	executor.Notify(latencyTitle, diff.Microseconds())
+	executor.Notify(countTitle, 1)
 
 	return err
 }
