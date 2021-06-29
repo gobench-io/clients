@@ -107,7 +107,7 @@ func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, me
 	begin := time.Now()
 
 	log.Println("New stream")
-	cs, err := cc.ClientConnInterface.NewStream(ctx, desc, method, opts...)
+	cs, err := cc.ClientConn.NewStream(ctx, desc, method, opts...)
 
 	// todo: record the duration
 	_ = time.Since(begin)
