@@ -11,7 +11,7 @@ import (
 )
 
 type GbClientConn struct {
-	grpc.ClientConnInterface
+	grpc.ClientConn
 	graphsMap map[string][]metrics.Graph
 	target    string
 }
@@ -26,7 +26,8 @@ func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (c
 		target:    target,
 	}
 
-	conn.ClientConnInterface, err = grpc.DialContext(ctx, target, opts...)
+	c, err := grpc.DialContext(ctx, target, opts...)
+	conn.ClientConn = *c
 
 	return
 }
@@ -85,7 +86,7 @@ func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interfac
 
 	begin := time.Now()
 
-	err := cc.ClientConnInterface.Invoke(ctx, method, args, reply, opts...)
+	err := cc.ClientConn.Invoke(ctx, method, args, reply, opts...)
 
 	diff := time.Since(begin)
 
