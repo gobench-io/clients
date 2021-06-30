@@ -2,7 +2,6 @@ package gbGrpc
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/gobench-io/gobench/executor"
@@ -75,7 +74,6 @@ func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
 		group,
 	}
 
-	// waiting?
 	err := executor.Setup(groups)
 
 	return graphs, err
@@ -106,7 +104,6 @@ func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interfac
 func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
 	begin := time.Now()
 
-	log.Println("New stream")
 	cs, err := cc.ClientConn.NewStream(ctx, desc, method, opts...)
 
 	// todo: record the duration

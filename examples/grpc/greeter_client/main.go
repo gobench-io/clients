@@ -31,6 +31,7 @@ func f(ctx context.Context, vui int) {
 		log.Fatalf("did not connect: %v", err)
 	}
 	defer conn.Close()
+
 	c := pb.NewGreeterClient(conn)
 
 	name := fmt.Sprintf("hello from vui %d", vui)
@@ -47,7 +48,7 @@ func f(ctx context.Context, vui int) {
 			defer cancel()
 			r, err := c.SayHello(ctx, &pb.HelloRequest{Name: name})
 			if err != nil {
-				log.Fatalf("could not greet: %v", err)
+				log.Printf("Could not greet: %v\n", err)
 			}
 			log.Printf("Greeting: %s", r.GetMessage())
 		}
