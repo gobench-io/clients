@@ -2,6 +2,7 @@ package gbGrpc
 
 import (
 	"context"
+	"io"
 	"time"
 
 	"github.com/gobench-io/gobench/executor"
@@ -257,7 +258,8 @@ func (cs *GbClientStream) RecvMsg(m interface{}) error {
 
 	latencyTitle := cs.graphs[5].Metrics[0].Title
 	countTitle := cs.graphs[4].Metrics[0].Title
-	if err != nil {
+	// could be EOF when the stream ended which is not an error
+	if err != nil && err != io.EOF {
 		countTitle = cs.graphs[4].Metrics[1].Title
 	}
 

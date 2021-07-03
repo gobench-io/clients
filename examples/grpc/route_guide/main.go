@@ -24,40 +24,53 @@ func export() scenario.Vus {
 }
 
 func f(ctx context.Context, vui int) {
-	address := "localhost:10000"
+	address := "localhost:50051"
 
 	// Set up a connection to the server.
 	conn, err := gbGrpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Printf("did not connect: %v", err)
+		return
 	}
 	defer conn.Close()
 
 	client := pb.NewRouteGuideClient(conn)
+
+	timeout := time.After(2 * time.Minute)
+
+	for {
+		select {
+		case <-timeout:
+			return
+
+		default:
+			listFeatures(client)
+		}
+	}
+}
+
+func listFeatures(client pb.RouteGuideClient) {
 	rect := &pb.Rectangle{
 		Lo: &pb.Point{Latitude: 400000000, Longitude: -750000000},
 		Hi: &pb.Point{Latitude: 420000000, Longitude: -730000000},
 	}
-
-	log.Printf("Looking for features within %v", rect)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	stream, err := client.ListFeatures(ctx, rect)
 	if err != nil {
-		log.Fatalf("%v.ListFeatures(_) = _, %v", client, err)
+		log.Printf("%v.ListFeatures(_) = _, %v", client, err)
+		return
 	}
 
 	for {
-		feature, err := stream.Recv()
+		_, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
 			log.Fatalf("%v.ListFeatures(_) = _, %v", client, err)
 		}
-		log.Printf("Feature: name: %q, point:(%v, %v)", feature.GetName(),
-			feature.GetLocation().GetLatitude(), feature.GetLocation().GetLongitude())
 	}
 }
