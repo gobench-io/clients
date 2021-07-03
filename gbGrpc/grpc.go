@@ -108,6 +108,56 @@ type GbClientStream struct {
 	method          string
 }
 
+func (cs *GbClientStream) setupMethod(target string, method string) (
+	[]metrics.Graph, error,
+) {
+	if graphs, ok := cs.methodGraphsMap[method]; ok {
+		return graphs, nil
+	}
+
+	graphs := []metrics.Graph{
+		{
+			Title: "New Stream",
+			Unit:  "N",
+			Metrics: []metrics.Metric{
+				{
+					Title: method + ".new_stream_ok", // success
+					Type:  metrics.Counter,
+				},
+				{
+					Title: method + ".new_stream_fail", // fail
+					Type:  metrics.Counter,
+				},
+			},
+		},
+		{
+			Title: "Latency",
+			Unit:  "Microsecond",
+			Metrics: []metrics.Metric{
+				{
+					Title: method + ".latency", // latency
+					Type:  metrics.Histogram,
+				},
+			},
+		},
+	}
+
+	cs.methodGraphsMap[method] = graphs
+
+	group := metrics.Group{
+		Name:   "gRPC stream (" + cs.target + ")",
+		Graphs: graphs,
+	}
+
+	groups := []metrics.Group{
+		group,
+	}
+
+	err := executor.Setup(groups)
+
+	return graphs, err
+}
+
 /**
 what to record
 CloseSend
@@ -123,10 +173,16 @@ func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, me
 		method:          method,
 	}
 
+	graphs, _ := gcn.setupMethod(cc.target, method)
+
+	begin := time.Now()
+
 	cs, err := cc.ClientConn.NewStream(ctx, desc, method, opts...)
 	if err != nil {
 		return cs, err
 	}
+
+	diff := time.Since(begin)
 
 	gcn.ClientStream = cs
 

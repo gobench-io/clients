@@ -24,7 +24,7 @@ func export() scenario.Vus {
 }
 
 func f(ctx context.Context, vui int) {
-	address := "localhost:50051"
+	address := "localhost:10000"
 
 	// Set up a connection to the server.
 	conn, err := gbGrpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
