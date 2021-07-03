@@ -11,8 +11,8 @@ import (
 
 type GbClientConn struct {
 	grpc.ClientConn
-	graphsMap map[string][]metrics.Graph
-	target    string
+	methodGraphsMap map[string][]metrics.Graph
+	target          string
 }
 
 func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
@@ -21,8 +21,8 @@ func Dial(target string, opts ...grpc.DialOption) (*GbClientConn, error) {
 
 func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (conn *GbClientConn, err error) {
 	conn = &GbClientConn{
-		graphsMap: make(map[string][]metrics.Graph),
-		target:    target,
+		methodGraphsMap: make(map[string][]metrics.Graph),
+		target:          target,
 	}
 
 	c, err := grpc.DialContext(ctx, target, opts...)
@@ -32,7 +32,7 @@ func DialContext(ctx context.Context, target string, opts ...grpc.DialOption) (c
 }
 
 func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
-	if graphs, ok := cc.graphsMap[method]; ok {
+	if graphs, ok := cc.methodGraphsMap[method]; ok {
 		return graphs, nil
 	}
 
@@ -63,7 +63,7 @@ func (cc *GbClientConn) setupMethod(method string) ([]metrics.Graph, error) {
 		},
 	}
 
-	cc.graphsMap[method] = graphs
+	cc.methodGraphsMap[method] = graphs
 
 	group := metrics.Group{
 		Name:   "gRPC (" + cc.target + ")",
@@ -101,13 +101,34 @@ func (cc *GbClientConn) Invoke(ctx context.Context, method string, args interfac
 	return err
 }
 
-func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	begin := time.Now()
+type GbClientStream struct {
+	grpc.ClientStream
+	methodGraphsMap map[string][]metrics.Graph
+	target          string
+	method          string
+}
+
+/**
+what to record
+CloseSend
+SendMsg
+RecvMsg
+*/
+func (cc *GbClientConn) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
+	grpc.ClientStream, error,
+) {
+	gcn := &GbClientStream{
+		methodGraphsMap: make(map[string][]metrics.Graph),
+		target:          cc.target,
+		method:          method,
+	}
 
 	cs, err := cc.ClientConn.NewStream(ctx, desc, method, opts...)
+	if err != nil {
+		return cs, err
+	}
 
-	// todo: record the duration
-	_ = time.Since(begin)
+	gcn.ClientStream = cs
 
 	return cs, err
 }
